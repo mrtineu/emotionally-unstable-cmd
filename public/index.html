@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emotionally Unstable CMD</title>
+<meta name="description" content="A Windows 7 command prompt with the emotional stability of a theatre kid on opening night. Be nice to it.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23000'/%3E%3Ctext x='3' y='21' font-family='monospace' font-size='13' fill='%23c0c0c0'%3EC:%5C_%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- BOOT -->
+<div id="boot" class="screen">
+  <div class="boot-orbs"><i></i><i></i><i></i><i></i></div>
+  <div class="boot-text">Starting Windows</div>
+  <div class="boot-copy">© Drama Corporation</div>
+</div>
+
+<!-- LOGIN -->
+<div id="login" class="screen hidden">
+  <div class="login-box">
+    <div class="user-tile"><div class="user-pic">🎭</div></div>
+    <form id="login-form" autocomplete="off">
+      <input id="login-name" maxlength="16" placeholder="User name" spellcheck="false" required>
+      <button type="submit" aria-label="Log on">➜</button>
+    </form>
+    <div class="login-hint">Log on as the new IT administrator.<br>Your name goes on the Hall of Fame.</div>
+  </div>
+  <div class="login-brand">Windows<sup>7</sup> <span>Emotionally Unstable Edition</span></div>
+  <button class="login-sound" id="login-mute" type="button" title="Sound on/off">🔊</button>
+</div>
+
+<!-- WELCOME -->
+<div id="welcome" class="screen hidden">
+  <div class="spinner"></div><span>Welcome</span>
+</div>
+
+<!-- DESKTOP -->
+<div id="desktop" class="screen hidden">
+  <div class="wall"><i></i><i></i><i></i></div>
+
+  <div id="icons">
+    <button class="icon" data-icon="computer"><span class="ico">🖥️</span><span>Computer</span></button>
+    <button class="icon" data-icon="recycle"><span class="ico">🗑️</span><span>Recycle Bin</span></button>
+    <button class="icon" data-icon="cmd"><span class="ico ico-cmd">C:\_</span><span>Command Prompt</span></button>
+    <button class="icon" data-icon="limewire"><span class="ico">🍋</span><span>LimeWire</span></button>
+    <button class="icon" data-icon="hof"><span class="ico">🏆</span><span>Hall of Fame</span></button>
+  </div>
+
+  <div id="bonzi" title="bonzibuddy.exe">
+    <div class="bonzi-bubble"></div>
+    <div class="bonzi-body">🦍</div>
+  </div>
+
+  <aside id="gadgets">
+    <div class="gadget mood">
+      <div class="gadget-title">Emotional Resource Monitor</div>
+      <svg viewBox="0 0 200 118" class="gauge" aria-hidden="true">
+        <defs>
+          <linearGradient id="gg" x1="0" x2="1">
+            <stop offset="0" stop-color="#e53935"/><stop offset=".45" stop-color="#fdd835"/><stop offset="1" stop-color="#43d047"/>
+          </linearGradient>
+        </defs>
+        <path d="M22 100 A78 78 0 0 1 178 100" fill="none" stroke="#0006" stroke-width="18" stroke-linecap="round"/>
+        <path d="M22 100 A78 78 0 0 1 178 100" fill="none" stroke="url(#gg)" stroke-width="12" stroke-linecap="round"/>
+        <g id="needle"><line x1="100" y1="100" x2="100" y2="34" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/></g>
+        <circle cx="100" cy="100" r="8" fill="#e8eef5" stroke="#0008"/>
+      </svg>
+      <div class="mood-num"><span id="mood-pct">60</span>%</div>
+      <div class="mood-label">Emotional stability: <b id="mood-label">Content</b></div>
+      <div class="mood-stats">
+        <span>Sabotages: <b id="stat-sab">0</b></span>
+        <span>Brain: <b id="stat-brain">Gemini</b></span>
+      </div>
+    </div>
+
+    <div class="sticky">
+      <div class="sticky-head"><span>IT TICKETS</span><span id="timer">00:00</span></div>
+      <ol id="tickets"></ol>
+      <div class="sticky-foot">Be nice. It has feelings. Type <b>help</b>.</div>
+    </div>
+  </aside>
+
+  <section id="cmd" class="window">
+    <header class="titlebar">
+      <span class="tb-icon">C:\</span>
+      <span class="tb-title" id="cmd-title">Administrator: Command Prompt</span>
+      <span class="tb-btns">
+        <button class="tb-min" data-act="min" aria-label="Minimize"><i></i></button>
+        <button class="tb-max" data-act="max" aria-label="Maximize"><i></i></button>
+        <button class="tb-close" data-act="close" aria-label="Close">✕</button>
+      </span>
+    </header>
+    <div class="term" id="term">
+      <div id="out"></div>
+      <div class="inputline" id="inputline">
+        <span id="prompt"></span><input id="cmdin" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Command input">
+      </div>
+      <div class="statusline" id="statusline"></div>
+    </div>
+  </section>
+
+  <div id="popups"></div>
+
+  <section id="hof" class="window dialog hidden">
+    <header class="titlebar">
+      <span class="tb-icon">🏆</span>
+      <span class="tb-title">Hall of Fame - Most Emotionally Supportive Admins</span>
+      <span class="tb-btns"><button class="tb-close" data-act="close-hof" aria-label="Close">✕</button></span>
+    </header>
+    <div class="dialog-body">
+      <div id="win-panel" class="hidden">
+        <h2>Ticket queue cleared!</h2>
+        <p class="win-quote" id="win-quote"></p>
+        <table class="score-table" id="score-table"></table>
+        <div class="dialog-btns">
+          <button id="btn-submit" class="aero-btn primary">Submit to Hall of Fame</button>
+        </div>
+      </div>
+      <h3 id="board-title">Top 10 <small id="board-src"></small></h3>
+      <ol id="board"></ol>
+      <div class="dialog-btns">
+        <button id="btn-again" class="aero-btn">Play again</button>
+        <button id="btn-close-hof" class="aero-btn">Close</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="startmenu" class="hidden">
+    <div class="sm-left">
+      <button data-sm="cmd"><span class="ico-cmd small">C:\_</span> Command Prompt</button>
+      <button data-sm="hof">🏆 Hall of Fame</button>
+      <button data-sm="mute">🔊 Sound on/off</button>
+      <button data-sm="howto">❓ How to play</button>
+    </div>
+    <div class="sm-right">
+      <div class="sm-user" id="sm-user">Admin</div>
+      <button data-sm="restart">Restart</button>
+      <button data-sm="shutdown">Shut down ▸</button>
+    </div>
+  </div>
+
+  <footer id="taskbar">
+    <button id="orb" aria-label="Start"><span class="flag"><i></i><i></i><i></i><i></i></span></button>
+    <div class="tb-apps">
+      <button class="tb-app" data-app="ie" title="Internet Explorer 6 (with 7 toolbars)">🌐</button>
+      <button class="tb-app" data-app="explorer" title="Windows Explorer">📁</button>
+      <button class="tb-app active" id="tb-cmd" data-app="cmd" title="Command Prompt"><span class="ico-cmd small">C:\_</span></button>
+    </div>
+    <div class="tray">
+      <button id="tray-sound" title="Sound">🔊</button>
+      <span title="Network: emotionally available">📶</span>
+      <div class="clock"><span id="clock-time">4:20 PM</span><span id="clock-date">11/21/2009</span></div>
+      <span class="show-desktop" title="Show desktop"></span>
+    </div>
+  </footer>
+
+  <div id="balloon" class="hidden"></div>
+</div>
+
+<!-- BSOD -->
+<div id="bsod" class="screen hidden"><pre id="bsod-text"></pre></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

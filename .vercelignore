@@ -1,0 +1,7 @@
+# never upload credentials with `vercel` CLI deploys
+.env
+.env.*
+*service-account*.json
+*-key.json
+gcp-*.json
+scripts/

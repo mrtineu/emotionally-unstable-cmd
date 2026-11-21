@@ -1,0 +1,14 @@
+{
+  "name": "emotionally-unstable-cmd",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A Windows 7 command prompt with the emotional stability of a theatre kid on opening night.",
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "check-ai": "node scripts/check-ai.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
