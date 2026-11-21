@@ -56,7 +56,7 @@ const S = {
   busy: false, sulk: 0, history: [], cmdHistory: [], histIdx: 0, recentNice: [],
   failStreak: 0, lastInputAt: 0, idleCount: 0, ended: false, won: false, enterWaiter: null,
   baseTitle: 'Administrator: Command Prompt', notResp: false, minimized: false, selfMin: false,
-  timers: [], nextNag: 0, tab: null, submitted: false, myId: null,
+  timers: [], nextNag: 0, tab: null, submitted: false, myId: null, divaCooldown: 0,
 };
 
 function later(fn, ms) { const t = setTimeout(fn, ms); S.timers.push(t); return t; }
@@ -218,7 +218,9 @@ async function perform(p, gen) {
     return;
   }
 
-  if (p.kind === 'readonly' || p.kind === 'invalid') await p.run(io);
+  if (S.divaCooldown > 0) S.divaCooldown--;
+  const divaRead = p.kind === 'readonly' && S.mood >= 60 && S.divaCooldown === 0 && Math.random() < DIVA_READONLY;
+  if ((p.kind === 'readonly' && !divaRead) || p.kind === 'invalid') await p.run(io);
   if (!alive()) return;
 
   const niceRepeat = p.kind === 'nice' ? S.recentNice.filter((t) => t === p.niceType).length : 0;
@@ -250,6 +252,7 @@ async function perform(p, gen) {
   D.statBrain.textContent = brain.lastSource === 'ai' ? 'Gemini' : 'Offline';
 
   let delta = clamp(Math.round(Number(verdict.mood_delta) || 0), -25, 20);
+  if (mission && p.polite) delta = Math.max(delta, -3); // the show must go on: polite ticket work never hurts much
   if (niceRepeat >= 3) delta = Math.min(delta, 0);
   else if (niceRepeat >= 2) delta = Math.min(delta, 3);
   if (p.kind === 'betrayal') delta = Math.min(delta, -8);
@@ -282,8 +285,9 @@ async function perform(p, gen) {
       await p.sabotage.run(io);
     } else {
       S.failStreak++;
-      spoken = await say(verdict.refuse_line || 'No.');
-      if (S.mood < 30 && Math.random() < 0.5) {
+      spoken = await say(verdict.refuse_line || pick(DIVA_LINES));
+      if (choice === 'diva') divaHint();
+      else if (S.mood < 30 && Math.random() < 0.5) {
         S.sulk = 2;
         io.print('(CMD is giving you the silent treatment. Try being nice.)', 'dim');
       }
@@ -295,6 +299,9 @@ async function perform(p, gen) {
   } else if (p.kind === 'betrayal') {
     await p.run(io);
     spoken = await say(reaction);
+  } else if (divaRead) {
+    spoken = await say(verdict.refuse_line || pick(DIVA_LINES));
+    divaHint();
   } else {
     spoken = await say(reaction);
   }
@@ -306,9 +313,28 @@ async function perform(p, gen) {
   checkMissions();
 }
 
+// Even a happy diva has moments. Kept rare and never back-to-back (divaCooldown).
+const DIVA_ACTION = 0.10;
+const DIVA_READONLY = 0.06;
+const DIVA_LINES = [
+  '*holds up one finger* Not now, darling. I am mid-vocal-warm-up. Mi-mi-mi-MIIII.',
+  'I simply... cannot. Not in this lighting. Ask me again in a moment.',
+  '*dramatic pause that lasts too long* ...No. Ask me again, with FEELING.',
+  'My agent says I don\'t do that scene on Saturdays.',
+];
+const DIVA_HINTS = [
+  '(CMD is having a diva moment. Just ask again.)',
+  '(Refused for artistic reasons. Try the same command again.)',
+  '(The star needs a moment. Ask again, maybe with a please.)',
+];
+function divaHint() {
+  S.divaCooldown = 5;
+  io.print(pick(DIVA_HINTS), 'dim');
+}
+
 function decide(p) {
   const m = S.mood;
-  if (m >= 60) return 'comply';
+  if (m >= 60) return S.divaCooldown === 0 && Math.random() < DIVA_ACTION ? 'diva' : 'comply';
   let [sab, ref] = m >= 40 ? [0.25, 0.12] : m >= 20 ? [0.42, 0.25] : [0.45, 0.4];
   if (S.failStreak >= 2) { sab /= 2; ref /= 2; } // pity
   const r = Math.random();
@@ -566,7 +592,7 @@ function startGame() {
     busy: false, sulk: 0, history: [], cmdHistory: [], histIdx: 0, recentNice: [], failStreak: 0,
     lastInputAt: Date.now(), idleCount: 0, ended: false, won: false, enterWaiter: null,
     baseTitle: 'Administrator: Command Prompt', notResp: false, minimized: false, selfMin: false,
-    nextNag: Date.now() + 40_000, tab: null, submitted: false, myId: null,
+    nextNag: Date.now() + 40_000, tab: null, submitted: false, myId: null, divaCooldown: 3,
   });
 
   // reset visuals

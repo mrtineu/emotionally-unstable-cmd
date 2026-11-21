@@ -96,7 +96,9 @@ wonderful"). Spamming the same one makes CMD suspicious. Coffee is a mistake.
 **Lowering the mood:** bare commands, typos, ALL CAPS, insults, and any mention of PowerShell,
 Linux, bash, sudo or Mac. Typing `exit`, `shutdown`, `format c:` or `taskkill /im cmd.exe` counts as betrayal.
 
-**Mood effects:** at 60% or above CMD always complies. Below that it may **sabotage** (do the
+**Mood effects:** at 60% or above CMD almost always complies. It still has the occasional diva
+moment and refuses (10% of actions, 6% of read-only commands, never twice in a row), so just ask
+again. A ticket command asked politely costs at most 3 mood points, even for poor Bonzi. Below that it may **sabotage** (do the
 wrong thing on purpose, for example killing explorer.exe instead of Bonzi) or **refuse**. Below
 30% it may give you the silent treatment. Below 15% it may minimize itself; click the flashing
 taskbar button to bring it back. At 0% you get a BSOD.

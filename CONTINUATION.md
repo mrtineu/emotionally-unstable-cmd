@@ -151,3 +151,7 @@ Popup messages (max 3 on screen, random position, `sfx.popup`), buttons [OK] [Ap
   Key at ./gcp-service-account.json (gitignored + .vercelignore), .env uses GOOGLE_APPLICATION_CREDENTIALS. For Vercel: GOOGLE_SERVICE_ACCOUNT_JSON.
 - User considered OpenRouter/DeepInfra; declined, Flash-Lite is fast enough.
 - Client timeout raised to 9.5s (server aborts at 8.5s).
+
+## Update: diva refusals + polite ticket cap
+- main.js: random 'diva' refusals at mood>=60 (DIVA_ACTION .10, DIVA_READONLY .06; readonly roll happens before output), dim hint, 5-command cooldown (starts at 3).
+- Polite + open mission => delta >= -3 (client clamp) and matching rule in the api/cmd.js prompt; refuse_line is playful at mood 60+.
