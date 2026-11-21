@@ -83,7 +83,7 @@ just does what you ask.
 | Ticket | Solution |
 |---|---|
 | #101 Bonzi | `please taskkill /im bonzibuddy.exe` |
-| #102 Ask toolbar | `please reg delete HKCU\Software\AskToolbar` |
+| #102 Ask toolbar | `please reg delete HKCU\Software\AskToolbar` (also stops the "HOT Google Developers in your area" ads) |
 | #103 LimeWire | `please cd Downloads`, then `please del Linkin` + **Tab** |
 | #104 Flash nag | `please reg add HKLM\Software\Macromedia\FlashPlayer /v UpdateNagCount /d 0 /f` |
 | #105 MySpace | `please ping myspace-server` |

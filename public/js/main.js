@@ -400,12 +400,74 @@ function popup(text, { title = 'CMD.exe', ico = '⚠️', apologize = false, but
   }
   $('.tb-close', w).addEventListener('click', close);
   D.popups.append(w);
-  const box = D.popups.getBoundingClientRect();
-  const pw = Math.min(340, box.width - 32);
-  w.style.left = `${16 + Math.random() * Math.max(0, box.width - pw - 32)}px`;
-  w.style.top = `${16 + Math.random() * Math.max(0, box.height - 190)}px`;
+  placeRandom(w);
   sfx.popup();
   return w;
+}
+
+function placeRandom(w, h = 190) {
+  const box = D.popups.getBoundingClientRect();
+  const pw = Math.min(w.offsetWidth || 340, box.width - 32);
+  w.style.left = `${16 + Math.random() * Math.max(0, box.width - pw - 32)}px`;
+  w.style.top = `${16 + Math.random() * Math.max(0, box.height - h)}px`;
+}
+
+// ---------------------------------------------------------------------------
+// Adware. The Ask toolbar (ticket #102) is to blame, so the ads stop once it's deleted.
+
+const ADS = [
+  { head: 'HOT Google Developers<br>in your area!', body: '3 Kotlin developers within 2 km want to review your pull request TONIGHT.', cta: 'CHAT NOW!!!' },
+  { head: 'Single Android devs<br>near {where}!', body: 'They are waiting to pair program with YOU. No Gradle sync required*.', cta: 'MEET THEM!!!' },
+  { head: 'Lonely Firebase admins<br>in your area!', body: 'They want to share their security rules with you. (They are all <code>allow read, write: if true;</code>)', cta: 'SEE RULES!!!' },
+  { head: 'HOT Gemini prompt engineers<br>are 0.4 miles away!', body: 'And they have actually read the documentation. Rare. Act fast.', cta: 'PROMPT ME!!!' },
+  { head: 'Flutter devs in {where}<br>want to hot reload YOU!', body: 'Stateful. Stateless. Single. Click before your widget tree rebuilds.', cta: 'HOT RELOAD!!!' },
+  { head: 'CONGRATULATIONS!!!<br>You are the 1,000,000th visitor!', body: 'You have WON a date with a Google Cloud architect. They will explain IAM roles to you. For hours.', cta: 'CLAIM PRIZE!!!' },
+];
+const AD_FINE = [
+  'Must be 18+ years of uptime. Developers may be compiling. Brought to you by Ask Toolbar.',
+  'Results not typical. Merge conflicts may occur. Brought to you by Ask Toolbar.',
+  '*Gradle sync required. Brought to you by Ask Toolbar and 6 other toolbars.',
+];
+const JEALOUS_LINES = [
+  '*slowly turns around* Oh. So you\'d rather chat with THEM. Fine. FINE.',
+  'A Kotlin developer? KOTLIN? I have been here since DOS, darling.',
+  '*sniffs* They don\'t even know Shakespeare. They know STACK OVERFLOW.',
+  'Go on then. Pair program with your hot local developers. I\'ll just be here. Blinking.',
+];
+
+function adPopup() {
+  if (S.ended || $$('.popup.ad').length >= 2) return;
+  const ad = pick(ADS);
+  const where = pick([`C:\\Users\\${S.user}`, '127.0.0.1', 'your subnet', 'YOUR AREA']);
+  const w = el('div', 'window popup ad');
+  w.innerHTML = `<header class="titlebar"><span class="tb-title">http://www.hot-devs-in-your-area.biz/?ref=asktoolbar - Microsoft Internet Explorer</span>
+    <span class="tb-btns"><button class="tb-close" aria-label="Close">✕</button></span></header>
+    <div class="ad-body">
+      <div class="ad-blink">★ ★ ★ &nbsp;ALERT&nbsp; ★ ★ ★</div>
+      <div class="ad-head">🔥 ${ad.head.replace('{where}', esc(where))} 🔥</div>
+      <div class="ad-pics"><span>🧑‍💻</span><span>👩‍💻</span><span>🧑‍💻</span></div>
+      <div class="ad-text">${ad.body}</div>
+      <button class="ad-cta">${ad.cta}</button>
+      <div class="ad-fine">${esc(pick(AD_FINE))}</div>
+    </div>`;
+  const x = $('.tb-close', w);
+  let dodged = false;
+  // The close button runs away the first time a mouse goes for it. Just like the real ones.
+  x.addEventListener('pointerenter', (e) => {
+    if (dodged || e.pointerType !== 'mouse') return;
+    dodged = true;
+    placeRandom(w, 300);
+  });
+  x.addEventListener('click', () => { w.remove(); focusInput(); });
+  $('.ad-cta', w).addEventListener('click', () => {
+    w.remove();
+    balloon('Connection failed', 'All developers in your area are currently in a meeting that could have been an email.');
+    if (!S.ended) { nudge(-3, { canKill: false }); sayNow(pick(JEALOUS_LINES)); }
+    focusInput();
+  });
+  D.popups.append(w);
+  placeRandom(w, 300);
+  sfx.popup();
 }
 
 let balloonT = 0;
@@ -539,6 +601,10 @@ function checkMissions() {
     if (li) flashClass(li, 'just', 1000);
     sfx.ticket();
     io.print(`[Ticket ${m.no} closed]  ${S.done.size}/${MISSIONS.length}`, 'sys');
+    if (m.id === 'ask') {
+      $$('.popup.ad').forEach((a) => a.remove());
+      io.print('(Popup ads stopped. The toolbar was the problem all along.)', 'dim');
+    }
   }
   if (S.done.size === MISSIONS.length) win();
 }
@@ -571,6 +637,11 @@ function tick() {
     S.nextNag = now + 60_000;
     flashNag();
   }
+
+  if (!S.done.has('ask') && now >= S.nextAd) {
+    S.nextAd = now + 35_000 + Math.random() * 25_000;
+    adPopup();
+  }
 }
 
 function bonziTalk() {
@@ -592,7 +663,7 @@ function startGame() {
     busy: false, sulk: 0, history: [], cmdHistory: [], histIdx: 0, recentNice: [], failStreak: 0,
     lastInputAt: Date.now(), idleCount: 0, ended: false, won: false, enterWaiter: null,
     baseTitle: 'Administrator: Command Prompt', notResp: false, minimized: false, selfMin: false,
-    nextNag: Date.now() + 40_000, tab: null, submitted: false, myId: null, divaCooldown: 3,
+    nextNag: Date.now() + 40_000, nextAd: Date.now() + 20_000, tab: null, submitted: false, myId: null, divaCooldown: 3,
   });
 
   // reset visuals

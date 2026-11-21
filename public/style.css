@@ -245,6 +245,31 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .popup .p-txt { flex: 1; line-height: 1.4; }
 .popup .dialog-btns { margin-top: 0; padding: 10px 12px; background: #f0f0f0; border: 1px solid #7a8a9a; border-top: 1px solid #dfdfdf; }
 
+/* adware */
+.popup.ad { width: min(320px, calc(100vw - 32px)); }
+.popup.ad .tb-title { font-size: 11px; }
+.ad-body {
+  text-align: center; padding: 10px 12px 8px; border: 3px ridge #ff0; color: #000;
+  font-family: "Comic Sans MS", "Comic Neue", "Chalkboard SE", cursive, var(--ui);
+  background: repeating-linear-gradient(45deg, #fff200 0 14px, #ffe100 14px 28px);
+}
+.ad-blink { color: #e00000; font-weight: 900; font-size: 13px; letter-spacing: 1px; animation: adblink .5s steps(1) infinite; }
+@keyframes adblink { 50% { color: #0000e0; } }
+.ad-head { margin: 6px 0; font-size: 21px; line-height: 1.15; font-weight: 900; color: #ff00a8; text-shadow: 2px 2px 0 #000, -1px -1px 0 #fff; }
+.ad-pics { font-size: 34px; display: flex; justify-content: center; gap: 6px; }
+.ad-pics span { display: inline-block; animation: adbounce .6s ease-in-out infinite alternate; }
+.ad-pics span:nth-child(2) { animation-delay: .2s; }
+.ad-pics span:nth-child(3) { animation-delay: .4s; }
+@keyframes adbounce { to { transform: translateY(-6px) rotate(6deg); } }
+.ad-text { font-size: 13px; margin: 4px 0 8px; }
+.ad-text code { font: 11px var(--mono); background: #fff; padding: 0 2px; }
+.ad-cta {
+  font: 900 17px "Comic Sans MS", "Comic Neue", cursive, var(--ui); color: #fff; padding: 6px 18px; border: 3px outset #3f3; border-radius: 4px;
+  background: linear-gradient(#3cdc3c, #0a9a0a); text-shadow: 1px 1px 0 #000; animation: adpulse .8s ease-in-out infinite alternate;
+}
+@keyframes adpulse { to { transform: scale(1.08); box-shadow: 0 0 14px #ff0; } }
+.ad-fine { margin-top: 8px; font: 9px var(--ui); color: #555; }
+
 /* start menu */
 #startmenu {
   position: absolute; left: 0; bottom: 40px; z-index: 50; display: flex; width: min(400px, 100vw); border-radius: 6px 6px 0 0;

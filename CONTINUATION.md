@@ -155,3 +155,7 @@ Popup messages (max 3 on screen, random position, `sfx.popup`), buttons [OK] [Ap
 ## Update: diva refusals + polite ticket cap
 - main.js: random 'diva' refusals at mood>=60 (DIVA_ACTION .10, DIVA_READONLY .06; readonly roll happens before output), dim hint, 5-command cooldown (starts at 3).
 - Polite + open mission => delta >= -3 (client clamp) and matching rule in the api/cmd.js prompt; refuse_line is playful at mood 60+.
+
+## Update: adware popups
+- main.js adPopup(): parody 'HOT Google Developers in your area' ads (6 variants, PG). First at 20s, then every 35-60s while ticket #102 (Ask toolbar) is open; closing #102 removes them.
+  The close X dodges once on mouse hover; the CTA costs mood -3 (CMD jealous) and shows a balloon. Max 2 on screen. Styles under /* adware */ in style.css.
