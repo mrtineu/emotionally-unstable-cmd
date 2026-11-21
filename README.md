@@ -8,11 +8,12 @@ popups and minimizes itself. If its mood hits 0%, you get a blue screen of death
 Gemini (via **Vertex AI**) judges your tone and writes CMD's lines. Without credentials the game
 still works using a built-in offline drama engine.
 
-- No build step and no dependencies. The site is plain HTML/CSS/ES modules in `public/`.
+- No build step and no runtime dependencies. The site is plain HTML/CSS/ES modules in `public/`.
 - `api/cmd.js` is a Vercel function that calls Gemini on Vertex AI, so credentials never reach the
   browser. It also accepts a plain Gemini API (AI Studio) key.
-- `api/leaderboard.js` is a Vercel function backed by Upstash Redis. If Redis isn't configured,
-  the Hall of Fame falls back to the browser's localStorage.
+- `api/leaderboard.js` stores the Hall of Fame in Cloudflare KV or Upstash Redis. If neither is
+  configured, it falls back to the browser's localStorage.
+- Deploys to **Cloudflare Workers** (`wrangler.jsonc`, `src/worker.js`) or to Vercel.
 
 ## Run locally
 
@@ -54,25 +55,37 @@ Never commit key files. `.gitignore` covers the usual names, but double-check.
 Needs Node 18+. `dev-server.mjs` serves `public/` and routes `/api/<name>` to `api/<name>.js`,
 just like Vercel does.
 
-## Deploy to Vercel
+## Deploy to Cloudflare Workers (recommended)
 
-1. Push this folder to a Git repo and **Import** it in Vercel.
-2. Framework preset: **Other**. Leave the build command and output directory empty. Vercel
-   serves `public/` as static files and `api/*.js` as serverless functions automatically.
-3. **Settings → Environment Variables**:
-   - `GOOGLE_SERVICE_ACCOUNT_JSON` (or `VERTEX_API_KEY`), see **AI setup** above.
-   - `GEMINI_MODEL` (optional): overrides the default `gemini-3.5-flash-lite`.
-4. Shared leaderboard (optional): **Storage / Marketplace → Upstash → Redis**, then connect it to
-   the project. It sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` (the `UPSTASH_REDIS_REST_*`
-   names work too). Redeploy afterwards.
+`src/worker.js` serves `public/` as static assets and routes `/api/*`. The Hall of Fame uses
+Cloudflare KV, and `/api/cmd` has a free per-IP rate limit (120/min) to protect your Vertex
+credits. All of this is configured in `wrangler.jsonc`.
 
-Or use the CLI: `npx vercel`, then `npx vercel env add GOOGLE_SERVICE_ACCOUNT_JSON`, then `npx vercel --prod`.
+```bash
+npm install                                   # installs wrangler (dev dependency)
+npx wrangler login                            # once; opens the browser
+npx wrangler kv namespace create BOARD        # paste the printed id into wrangler.jsonc
+npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON < gcp-service-account.json
+npm run deploy                                # -> https://emotionally-unstable-cmd.<you>.workers.dev
+```
+
+To test in the Workers runtime locally, put
+`GOOGLE_SERVICE_ACCOUNT_JSON=<base64 of the key file>` in `.dev.vars` (gitignored) and run
+`npm run cf:dev`. `npm run dev` (plain Node) also still works.
+
+## Deploy to Vercel (alternative)
+
+The same `api/*.js` files work as Vercel functions with no changes.
+
+1. Import the repo in Vercel. Framework preset: **Other**. Leave the build command empty.
+2. Set the env var `GOOGLE_SERVICE_ACCOUNT_JSON` (or `VERTEX_API_KEY`). See **AI setup** above.
+3. Shared leaderboard (optional): Marketplace → Upstash Redis. It sets `KV_REST_API_URL`/`KV_REST_API_TOKEN`.
 
 ### Caveats
 
-- `/api/cmd` is an open proxy that spends your Vertex AI credits. Inputs are length-limited, but
-  there is no rate limiting. Set a **budget alert** in Cloud Billing and add Vercel Firewall rate
-  limiting for a public event.
+- `/api/cmd` is a public endpoint that spends your Vertex AI credits. On Cloudflare it's
+  rate-limited per IP, but a determined abuser can still use it. Set a **budget alert** in Cloud
+  Billing.
 - Scores are computed in the browser, so they can be faked. It's a conference toy.
 
 ## How to play / cheat sheet
@@ -120,7 +133,9 @@ public/js/brain.js    /api/cmd client and offline drama engine
 public/js/sound.js    WebAudio synth sound effects
 api/cmd.js            Gemini on Vertex AI (persona, mood rules, service-account auth)
 scripts/check-ai.mjs  one-shot test of the AI credentials
-api/leaderboard.js    Upstash Redis leaderboard
+api/leaderboard.js    leaderboard (Cloudflare KV or Upstash Redis)
+src/worker.js         Cloudflare Workers entry (assets + /api routes + rate limit)
+wrangler.jsonc        Cloudflare config (KV, rate limit, assets)
 dev-server.mjs        local dev server that mimics Vercel
 ```
 

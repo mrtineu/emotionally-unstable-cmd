@@ -159,3 +159,11 @@ Popup messages (max 3 on screen, random position, `sfx.popup`), buttons [OK] [Ap
 ## Update: adware popups
 - main.js adPopup(): parody 'HOT Google Developers in your area' ads (6 variants, PG). First at 20s, then every 35-60s while ticket #102 (Ask toolbar) is open; closing #102 removes them.
   The close X dodges once on mouse hover; the CTA costs mood -3 (CMD jealous) and shows a balloon. Max 2 on screen. Styles under /* adware */ in style.css.
+
+## Update: Cloudflare Workers deploy (user chose it over Vercel: Vercel account had no Hobby team)
+- api/cmd.js + api/leaderboard.js are platform-neutral: cores cmd(body, vars) / leaderboard(method, body, vars) return {status,data};
+  default exports stay Vercel/Node adapters. Web Crypto (crypto.subtle) JWT signing, no node: imports, no Buffer.
+- src/worker.js routes /api/*, else env.ASSETS. wrangler.jsonc: assets ./public, KV binding BOARD, ratelimit CMD_LIMITER 120/60s per cf-connecting-ip.
+- wrangler 4.158.0 devDependency. Verified locally with `wrangler dev` (.dev.vars holds base64 key; gitignored).
+- dev-server/check-ai turn GOOGLE_APPLICATION_CREDENTIALS (file) into GOOGLE_SERVICE_ACCOUNT_JSON.
+- Deploy steps: wrangler login (user) -> kv namespace create BOARD -> put id in wrangler.jsonc -> secret put -> wrangler deploy.

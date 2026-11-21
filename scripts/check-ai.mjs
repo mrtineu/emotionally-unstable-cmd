@@ -14,13 +14,17 @@ for (const f of ['.env', '.env.local']) {
   }
 }
 
-const { default: handler, provider, configured } = await import('../api/cmd.js');
-if (!configured()) {
+if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  process.env.GOOGLE_SERVICE_ACCOUNT_JSON = fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8');
+}
+
+const { default: handler, provider, configured, DEFAULT_MODEL } = await import('../api/cmd.js');
+if (!configured(process.env)) {
   console.error('No AI credentials found. See .env.example.');
   process.exit(1);
 }
-const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
-console.log('Provider:', (await provider(model)).name, '| model:', model);
+const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+console.log('Provider:', (await provider(process.env, model)).name, '| model:', model);
 
 const t0 = Date.now();
 let status = 200;

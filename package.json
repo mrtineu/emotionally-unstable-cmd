@@ -6,9 +6,14 @@
   "description": "A Windows 7 command prompt with the emotional stability of a theatre kid on opening night.",
   "scripts": {
     "dev": "node dev-server.mjs",
-    "check-ai": "node scripts/check-ai.mjs"
+    "check-ai": "node scripts/check-ai.mjs",
+    "cf:dev": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "wrangler": "4.158.0"
   }
 }

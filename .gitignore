@@ -6,3 +6,5 @@ node_modules
 *service-account*.json
 *-key.json
 gcp-*.json
+.dev.vars
+.wrangler

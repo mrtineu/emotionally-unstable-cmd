@@ -1,10 +1,10 @@
-// Vercel serverless function: asks Gemini how CMD.EXE *feels* about what you typed.
+// Asks Gemini how CMD.EXE *feels* about what you typed. Runs on Node (Vercel, dev server) and on
+// Cloudflare Workers: no Node-only APIs, settings come in as a plain `vars` object.
 // Credentials never leave the server. Providers, first match wins:
-//   1. Vertex AI + service account  GOOGLE_SERVICE_ACCOUNT_JSON (JSON or base64) or GOOGLE_APPLICATION_CREDENTIALS (file path)
+//   1. Vertex AI + service account  GOOGLE_SERVICE_ACCOUNT_JSON (JSON or base64)
 //   2. Vertex AI + API key          VERTEX_API_KEY (express mode)
 //   3. Gemini API (AI Studio)       GEMINI_API_KEY
-import { createSign } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+// (The dev server and check-ai script also accept GOOGLE_APPLICATION_CREDENTIALS=<file> and load it.)
 
 const SYSTEM = `You are CMD.EXE, the Command Prompt of a Windows 7 office PC, circa 2009.
 You are a DRAMATIC THEATRE KID. Every command is a scene, the user is your scene partner,
@@ -109,61 +109,74 @@ function sanitize(b = {}) {
 // ---------------------------------------------------------------------------
 // Provider selection + auth
 
-const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
-const env = (k) => (process.env[k] || '').trim();
+export const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+const get = (vars, k) => String(vars?.[k] ?? '').trim();
 
-let saCache; // undefined = not loaded yet, null = none configured
-function serviceAccount() {
-  if (saCache !== undefined) return saCache;
-  saCache = null;
-  let raw = env('GOOGLE_SERVICE_ACCOUNT_JSON');
-  if (!raw && env('GOOGLE_APPLICATION_CREDENTIALS')) {
-    try { raw = readFileSync(env('GOOGLE_APPLICATION_CREDENTIALS'), 'utf8'); } catch (e) { console.error('cannot read GOOGLE_APPLICATION_CREDENTIALS', e.message); }
-  }
-  if (!raw) return saCache;
-  for (const text of [raw, Buffer.from(raw, 'base64').toString('utf8')]) {
+const b64decode = (s) => new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
+const b64url = (data) => {
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const saCache = new Map(); // raw env value -> parsed key (or null)
+function serviceAccount(vars) {
+  const raw = get(vars, 'GOOGLE_SERVICE_ACCOUNT_JSON');
+  if (!raw) return null;
+  if (saCache.has(raw)) return saCache.get(raw);
+  let sa = null;
+  for (const decode of [(x) => x, b64decode]) {
     try {
-      const j = JSON.parse(text);
+      const j = JSON.parse(decode(raw));
       if (j.client_email && j.private_key) {
         j.private_key = j.private_key.replace(/\\n/g, '\n');
-        saCache = j;
+        sa = j;
         break;
       }
-    } catch { /* try next encoding */ }
+    } catch { /* try the next encoding */ }
   }
-  if (!saCache) console.error('GOOGLE_SERVICE_ACCOUNT_JSON is set but is not a valid service account key');
-  return saCache;
+  if (!sa) console.error('GOOGLE_SERVICE_ACCOUNT_JSON is set but is not a valid service account key');
+  saCache.set(raw, sa);
+  return sa;
 }
 
-const b64url = (s) => Buffer.from(s).toString('base64url');
-let tokenCache = { token: null, exp: 0 };
+let signingKey = null; // { pem, key }
+async function importKey(pem) {
+  if (signingKey?.pem === pem) return signingKey.key;
+  const der = Uint8Array.from(atob(pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '')), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  signingKey = { pem, key };
+  return key;
+}
+
+let tokenCache = { email: null, token: null, exp: 0 };
 async function accessToken(sa) {
-  if (tokenCache.token && Date.now() < tokenCache.exp - 60_000) return tokenCache.token;
+  if (tokenCache.email === sa.client_email && tokenCache.token && Date.now() < tokenCache.exp - 60_000) return tokenCache.token;
+  const tokenUri = sa.token_uri || 'https://oauth2.googleapis.com/token';
   const now = Math.floor(Date.now() / 1000);
-  const head = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claims = b64url(JSON.stringify({
-    iss: sa.client_email, scope: 'https://www.googleapis.com/auth/cloud-platform',
-    aud: sa.token_uri || 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
-  }));
-  const sig = createSign('RSA-SHA256').update(`${head}.${claims}`).sign(sa.private_key).toString('base64url');
-  const r = await fetch(sa.token_uri || 'https://oauth2.googleapis.com/token', {
+  const unsigned = `${b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${b64url(JSON.stringify({
+    iss: sa.client_email, scope: 'https://www.googleapis.com/auth/cloud-platform', aud: tokenUri, iat: now, exp: now + 3600,
+  }))}`;
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', await importKey(sa.private_key), new TextEncoder().encode(unsigned));
+  const r = await fetch(tokenUri, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${head}.${claims}.${sig}` }),
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${unsigned}.${b64url(sig)}` }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.access_token) throw new Error(`token exchange failed ${r.status} ${j.error || ''} ${j.error_description || ''}`);
-  tokenCache = { token: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000 };
+  tokenCache = { email: sa.client_email, token: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000 };
   return j.access_token;
 }
 
 // Returns { name, url, headers } or null when nothing is configured.
-export async function provider(model) {
+export async function provider(vars, model) {
   const m = encodeURIComponent(model);
-  const sa = serviceAccount();
+  const sa = serviceAccount(vars);
   if (sa) {
-    const project = env('VERTEX_PROJECT') || env('GOOGLE_CLOUD_PROJECT') || sa.project_id;
-    const loc = env('VERTEX_LOCATION') || 'global';
+    const project = get(vars, 'VERTEX_PROJECT') || get(vars, 'GOOGLE_CLOUD_PROJECT') || sa.project_id;
+    const loc = get(vars, 'VERTEX_LOCATION') || 'global';
     const host = loc === 'global' ? 'aiplatform.googleapis.com' : `${loc}-aiplatform.googleapis.com`;
     return {
       name: `vertex (service account, ${project}/${loc})`,
@@ -171,24 +184,24 @@ export async function provider(model) {
       headers: { authorization: `Bearer ${await accessToken(sa)}` },
     };
   }
-  if (env('VERTEX_API_KEY')) {
+  if (get(vars, 'VERTEX_API_KEY')) {
     return {
       name: 'vertex (api key)',
       url: `https://aiplatform.googleapis.com/v1/publishers/google/models/${m}:generateContent`,
-      headers: { 'x-goog-api-key': env('VERTEX_API_KEY') },
+      headers: { 'x-goog-api-key': get(vars, 'VERTEX_API_KEY') },
     };
   }
-  if (env('GEMINI_API_KEY')) {
+  if (get(vars, 'GEMINI_API_KEY')) {
     return {
       name: 'gemini api',
       url: `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,
-      headers: { 'x-goog-api-key': env('GEMINI_API_KEY') },
+      headers: { 'x-goog-api-key': get(vars, 'GEMINI_API_KEY') },
     };
   }
   return null;
 }
 
-export const configured = () => !!(serviceAccount() || env('VERTEX_API_KEY') || env('GEMINI_API_KEY'));
+export const configured = (vars) => !!(serviceAccount(vars) || get(vars, 'VERTEX_API_KEY') || get(vars, 'GEMINI_API_KEY'));
 
 // Thinking adds latency and nothing of value to a one-line quip, so keep it as low as each family allows.
 function thinkingFor(model) {
@@ -199,22 +212,20 @@ function thinkingFor(model) {
 }
 
 // ---------------------------------------------------------------------------
+// Platform-neutral core: returns { status, data }.
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
-  if (!configured()) return res.status(503).json({ error: 'no_key' });
-
-  let body = req.body;
+export async function cmd(body, vars) {
+  if (!configured(vars)) return { status: 503, data: { error: 'no_key' } };
   if (typeof body === 'string') {
     try { body = JSON.parse(body || '{}'); } catch { body = {}; }
   }
-  const payload = sanitize(body);
-  const model = env('GEMINI_MODEL') || DEFAULT_MODEL;
+  const payload = sanitize(body || {});
+  const model = get(vars, 'GEMINI_MODEL') || DEFAULT_MODEL;
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8500);
   try {
-    const prov = await provider(model);
+    const prov = await provider(vars, model);
     const call = (thinking) => {
       const generationConfig = {
         temperature: 1.0,
@@ -235,31 +246,40 @@ export default async function handler(req, res) {
       });
     };
 
-    let thinking = thinkingFor(model);
+    const thinking = thinkingFor(model);
     let r = await call(thinking);
     let data = await r.json().catch(() => ({}));
     // A model that rejects our thinking config still deserves a second chance.
     if (r.status === 400 && thinking && /think/i.test(JSON.stringify(data))) {
-      thinking = null;
       r = await call(null);
       data = await r.json().catch(() => ({}));
     }
     if (!r.ok) {
       console.error('Gemini error', prov.name, model, r.status, JSON.stringify(data).slice(0, 600));
-      return res.status(502).json({ error: 'upstream', status: r.status });
+      return { status: 502, data: { error: 'upstream', status: r.status } };
     }
     const text = (data.candidates?.[0]?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || '').join('');
     const out = JSON.parse(text);
-    return res.status(200).json({
-      mood_delta: int(out.mood_delta, -25, 20, 0),
-      reaction: str(out.reaction, 400) || '...',
-      sabotage_line: str(out.sabotage_line, 300) || '',
-      refuse_line: str(out.refuse_line, 300) || '',
-    });
+    return {
+      status: 200,
+      data: {
+        mood_delta: int(out.mood_delta, -25, 20, 0),
+        reaction: str(out.reaction, 400) || '...',
+        sabotage_line: str(out.sabotage_line, 300) || '',
+        refuse_line: str(out.refuse_line, 300) || '',
+      },
+    };
   } catch (e) {
-    console.error('cmd handler failed', e?.name, e?.message);
-    return res.status(502).json({ error: 'failed' });
+    console.error('cmd failed', e?.name, e?.message);
+    return { status: 502, data: { error: 'failed' } };
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Vercel / Node adapter (also used by dev-server.mjs).
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  const { status, data } = await cmd(req.body, process.env);
+  return res.status(status).json(data);
 }

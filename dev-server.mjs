@@ -17,6 +17,12 @@ for (const f of ['.env', '.env.local']) {
   }
 }
 
+// GOOGLE_APPLICATION_CREDENTIALS=<key file> is a local convenience; the API itself reads GOOGLE_SERVICE_ACCOUNT_JSON.
+if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  try { process.env.GOOGLE_SERVICE_ACCOUNT_JSON = fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8'); }
+  catch (e) { console.error('Cannot read GOOGLE_APPLICATION_CREDENTIALS:', e.message); }
+}
+
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json',
